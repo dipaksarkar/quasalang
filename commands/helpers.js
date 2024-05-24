@@ -5,13 +5,13 @@ function toCamelCase(input) {
     .map((word, index) => {
       if (index === 0) {
         // Keep the first word as is
-        return word.toLowerCase();
+        return word.toLowerCase()
       } else {
         // Capitalize the first character of each word
-        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
       }
     })
-    .join("");
+    .join('')
 }
 
-module.exports = { toCamelCase };
+module.exports = { toCamelCase }

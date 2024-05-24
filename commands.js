@@ -1,9 +1,9 @@
 #! /usr/bin/env node
 
-let pjson = require('./package.json');
+let pjson = require('./package.json')
 
-const program = require('commander');
-const { createCSV, generate, langSwitcher, listCodes, translate, parse } = require('./index.js');
+const program = require('commander')
+const { createCSV, generate, langSwitcher, listCodes, translate, parse } = require('./index.js')
 
 const helpText = `
 
@@ -17,12 +17,12 @@ Step 2. Add your own languages & phrases to /translations.csv
 
 Step 3. Generate your language files:
   $ quasalang generate
-`;
+`
 
 program
   .version(pjson.version)
   .description('Generate Quasar i18n language files from a CSV file. Run it from the root of a Quasar project.')
-  .addHelpText('after', helpText);
+  .addHelpText('after', helpText)
 
 program
   .command('generate')
@@ -39,8 +39,8 @@ program
   .option('-w, --watch', `Watch CSV file for changes & regenerate files`, false)
   .description('Generate your i18n folder & all language files based on a CSV file')
   .action((options) => {
-    generate(options);
-  });
+    generate(options)
+  })
 
 program
   .command('translate')
@@ -48,8 +48,8 @@ program
   .option('-f, --force', 'Force write files (without prompt)', false)
   .description('Translate your CSV file')
   .action((options) => {
-    translate(options);
-  });
+    translate(options)
+  })
 
 program
   .command('parse')
@@ -57,8 +57,8 @@ program
   .option('-f, --force', 'Force write files (without prompt)', false)
   .description('Parse your source files from (/src/**/*.{js,vue})')
   .action((options) => {
-    parse(options);
-  });
+    parse(options)
+  })
 
 program
   .command('create-csv')
@@ -66,8 +66,8 @@ program
   .option('-f, --force', 'Force overwrite translations file (without prompt)', false)
   .description('Create a sample CSV file (/translations.csv)')
   .action((options) => {
-    createCSV(options);
-  });
+    createCSV(options)
+  })
 
 program
   .command('lang-switcher')
@@ -75,8 +75,8 @@ program
   .option('-i, --input <mode>', 'Path to input CSV', 'translations.csv')
   .description(`Generate language switcher options array & output to console i.e. [{ label: 'English', value: 'en-US'}, ..]`)
   .action((options) => {
-    langSwitcher(options);
-  });
+    langSwitcher(options)
+  })
 
 program
   .command('list-codes')
@@ -84,7 +84,7 @@ program
   .option('-a, --add', 'Add locale codes to translations.csv', false)
   .description(`Search & list i18n locale codes`)
   .action((options) => {
-    listCodes(options);
-  });
+    listCodes(options)
+  })
 
-program.parse(process.argv);
+program.parse(process.argv)
