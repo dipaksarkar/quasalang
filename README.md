@@ -43,6 +43,7 @@ You can also:
     - [`lang-switcher`](#lang-switcher)
     - [`list-codes`](#list-codes)
     - [`parse`](#parse)
+      - [Example](#example)
     - [`translate`](#translate)
     - [`check-trans`](#check-trans)
     - [`trans-clean`](#trans-clean)
@@ -665,6 +666,32 @@ Parse your source files from (/src/**/*.{js,vue}) and Add them to (/translations
 
 Options:
   -h, --help  display help for command
+```
+
+#### Example
+
+Given the following label in your source files:
+
+```html
+<base-label>{{ $t("// Phone Number") }}</base-label>
+or
+<base-label>{{ $t("// label::Phone Number") }}</base-label>
+```
+
+The command will convert them to:
+
+```html
+<base-label>{{ $t("phoneNumber") }}</base-label>
+or
+<base-label>{{ $t("label.phoneNumber") }}</base-label>
+```
+
+The corresponding translation key will be added to `translations.csv`:
+
+```
+phoneNumber,"Phone Number"
+or
+label.phoneNumber,"Phone Number"
 ```
 
 ### `translate`
