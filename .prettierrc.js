@@ -3,6 +3,6 @@ module.exports = {
   tabWidth: 2,
   printWidth: 150,
   semi: true,
-  singleQuote: false
+  singleQuote: true
   //   bracketSameLine: true,
 };
