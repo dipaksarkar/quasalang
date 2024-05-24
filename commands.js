@@ -21,9 +21,7 @@ Step 3. Generate your language files:
 
 program
   .version(pjson.version)
-  .description(
-    "Generate Quasar i18n language files from a CSV file. Run it from the root of a Quasar project."
-  )
+  .description("Generate Quasar i18n language files from a CSV file. Run it from the root of a Quasar project.")
   .addHelpText("after", helpText);
 
 program
@@ -57,7 +55,7 @@ program
   .command("parse")
   .alias("p")
   .option("-f, --force", "Force write files (without prompt)", false)
-  .description("Parse your source files from ./src/**/*.{js,vue}")
+  .description("Parse your source files from (/src/**/*.{js,vue})")
   .action((options) => {
     parse(options);
   });
