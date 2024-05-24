@@ -4,11 +4,16 @@ require('./commands/translate.js')()
 require('./commands/lang-switcher.js')()
 require('./commands/list-codes.js')()
 require('./commands/parse.js')()
+require('./commands/check-trans.js')()
+require('./commands/trans-clean.js')()
 
 module.exports = {
   createCSV,
   generate,
   translate,
   langSwitcher,
-  parse
+  listCodes,
+  parse,
+  checkTrans,
+  transClean
 }

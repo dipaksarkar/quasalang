@@ -1,10 +1,11 @@
 var fs = require('fs')
 
 const { prompt } = require('inquirer')
+const { transPath } = require('./helpers')
 
 module.exports = function () {
   this.createCSV = function (options) {
-    let outputPath = 'translations.csv'
+    let outputPath = transPath
 
     // check if output file exists
     if (fs.existsSync(outputPath)) {
@@ -31,7 +32,7 @@ module.exports = function () {
     function copyFile() {
       fs.copyFile(`${__dirname}/../sample-csv/translations.csv`, `${outputPath}`, (err) => {
         if (err) throw err
-        console.log(`/translations.csv was generated.`)
+        console.log(`/${transPath} was generated.`)
       })
     }
   }

@@ -1,8 +1,6 @@
 const fs = require('fs')
 const csv = require('csv-parser')
-
-// File paths
-const translations = 'translations.csv'
+const { transPath } = require('./helpers')
 
 module.exports = function (langues) {
   // Read the input CSV file
@@ -10,8 +8,8 @@ module.exports = function (langues) {
   let headers = []
 
   // check if output file exists
-  if (fs.existsSync(translations)) {
-    fs.createReadStream(translations)
+  if (fs.existsSync(transPath)) {
+    fs.createReadStream(transPath)
       .pipe(csv())
       .on('headers', (headerList) => {
         headers = headerList
@@ -45,10 +43,10 @@ module.exports = function (langues) {
           csvData.push(values.join(','))
         })
 
-        fs.writeFileSync(translations, csvData.join('\n'))
+        fs.writeFileSync(transPath, csvData.join('\n'))
         console.log(`CSV file successfully written with new lang codes: ${langues.join(', ')}.`)
       })
   } else {
-    console.log("/translations.csv file doesn't exist!")
+    console.log(`/${transPath} file doesn't exist!`)
   }
 }

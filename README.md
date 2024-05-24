@@ -42,6 +42,10 @@ You can also:
     - [`create-csv`](#create-csv)
     - [`lang-switcher`](#lang-switcher)
     - [`list-codes`](#list-codes)
+    - [`parse`](#parse)
+    - [`translate`](#translate)
+    - [`check-trans`](#check-trans)
+    - [`trans-clean`](#trans-clean)
 
 ## Getting Started
 
@@ -647,6 +651,50 @@ Options:
 Usage: quasalang list-codes|lc [options]
 
 Search & list i18n locale codes
+
+Options:
+  -h, --help  display help for command
+```
+
+### `parse`
+
+```
+Usage: quasalang parse|p [options]
+
+Parse your source files from (/src/**/*.{js,vue}) and Add them to (/translations.csv) as Default language
+
+Options:
+  -h, --help  display help for command
+```
+
+### `translate`
+
+```
+Usage: quasalang translate|t [options]
+
+Translate your CSV file using Google translate
+
+Options:
+  -h, --help  display help for command
+```
+
+### `check-trans`
+
+```
+Usage: quasalang check-trans|ct [options]
+
+Find missing trans key in (/translations.csv) from (/src/**/*.{js,vue})
+
+Options:
+  -h, --help  display help for command
+```
+
+### `trans-clean`
+
+```
+Usage: quasalang trans-clean|tc [options]
+
+Remove unused trans key from (/translations.csv)
 
 Options:
   -h, --help  display help for command

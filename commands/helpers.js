@@ -1,3 +1,9 @@
+const fs = require('fs')
+
+const transPath = 'translations.csv'
+const transBackupFile = 'translations.csv.bak'
+const sourcePath = 'src'
+
 // Function to convert a string to Camel Case
 function toCamelCase(input) {
   return input
@@ -14,4 +20,10 @@ function toCamelCase(input) {
     .join('')
 }
 
-module.exports = { toCamelCase }
+// Function to create a backup of the input file
+function createBackup() {
+  fs.copyFileSync(transPath, transBackupFile)
+  console.log('Backup created:', transBackupFile)
+}
+
+module.exports = { toCamelCase, createBackup, transPath, transBackupFile, sourcePath }

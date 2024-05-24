@@ -3,7 +3,16 @@
 let pjson = require('./package.json')
 
 const program = require('commander')
-const { createCSV, generate, langSwitcher, listCodes, translate, parse } = require('./index.js')
+const {
+  createCSV,
+  generate,
+  langSwitcher,
+  listCodes,
+  translate,
+  parse,
+  checkTrans,
+  transClean
+} = require('./index.js')
 
 const helpText = `
 
@@ -21,7 +30,9 @@ Step 3. Generate your language files:
 
 program
   .version(pjson.version)
-  .description('Generate Quasar i18n language files from a CSV file. Run it from the root of a Quasar project.')
+  .description(
+    'Generate Quasar i18n language files from a CSV file. Run it from the root of a Quasar project.'
+  )
   .addHelpText('after', helpText)
 
 program
@@ -46,7 +57,7 @@ program
   .command('translate')
   .alias('t')
   .option('-f, --force', 'Force write files (without prompt)', false)
-  .description('Translate your CSV file')
+  .description('Translate your CSV file using Google translate')
   .action((options) => {
     translate(options)
   })
@@ -55,9 +66,27 @@ program
   .command('parse')
   .alias('p')
   .option('-f, --force', 'Force write files (without prompt)', false)
-  .description('Parse your source files from (/src/**/*.{js,vue})')
+  .description(
+    'Parse your source files from (/src/**/*.{js,vue}) and Add them to (/translations.csv) as Default language'
+  )
   .action((options) => {
     parse(options)
+  })
+
+program
+  .command('check-trans')
+  .alias('ct')
+  .description('Find missing trans key in (/translations.csv) from (/src/**/*.{js,vue})')
+  .action((options) => {
+    checkTrans(options)
+  })
+
+program
+  .command('trans-clean')
+  .alias('tc')
+  .description('Remove unused trans key from (/translations.csv)')
+  .action((options) => {
+    transClean(options)
   })
 
 program
@@ -73,7 +102,9 @@ program
   .command('lang-switcher')
   .alias('ls')
   .option('-i, --input <mode>', 'Path to input CSV', 'translations.csv')
-  .description(`Generate language switcher options array & output to console i.e. [{ label: 'English', value: 'en-US'}, ..]`)
+  .description(
+    `Generate language switcher options array & output to console i.e. [{ label: 'English', value: 'en-US'}, ..]`
+  )
   .action((options) => {
     langSwitcher(options)
   })

@@ -1,18 +1,14 @@
 const fs = require('fs')
 const glob = require('glob')
 const csv = require('csv-parser')
-const { toCamelCase } = require('./helpers')
-
-// Define the directory where you want to perform the replacement
-const sourcePath = './src'
-const originalCsvPath = './translations.csv'
+const { toCamelCase, sourcePath, transPath } = require('./helpers')
 
 let headers = []
 let parsedKeys = []
 let originalKeys = []
 
 // Read translations.csv and get the headers
-fs.createReadStream(originalCsvPath)
+fs.createReadStream(transPath)
   .pipe(csv())
   .on('headers', (row) => {
     headers = row
@@ -61,7 +57,7 @@ function replacePatternInFile(filePath) {
       const line = `${key},"${value}",${languages}\n`
       parsedKeys.push(key)
       // Append the line to the CSV file
-      fs.appendFile(originalCsvPath, line, (err) => {
+      fs.appendFile(transPath, line, (err) => {
         if (err) {
           console.error(`Error appending to CSV: ${err}`)
         } else {

@@ -1,22 +1,14 @@
 const fs = require('fs')
 const csv = require('csv-parser')
 const translatte = require('translatte')
-
-const inputFile = 'translations.csv'
-const backupFile = 'translations.csv.bak'
+const { transPath, createBackup } = require('./helpers')
 
 const translations = []
-
-// Function to create a backup of the input file
-function createBackup() {
-  fs.copyFileSync(inputFile, backupFile)
-  console.log('Backup created:', backupFile)
-}
 
 function changeLineInFile(lineNumber, row) {
   return new Promise((resolve, reject) => {
     // Read the contents of the file
-    fs.readFile(inputFile, 'utf8', (err, data) => {
+    fs.readFile(transPath, 'utf8', (err, data) => {
       if (err) {
         reject(err)
         return
@@ -40,7 +32,7 @@ function changeLineInFile(lineNumber, row) {
       const modifiedContent = lines.join('\n')
 
       // Write the modified contents back to the file
-      fs.writeFile(inputFile, modifiedContent, 'utf8', (err) => {
+      fs.writeFile(transPath, modifiedContent, 'utf8', (err) => {
         if (err) {
           reject(err)
           return
@@ -56,7 +48,7 @@ module.exports = function () {
     createBackup()
 
     // Parse the CSV file
-    fs.createReadStream(inputFile)
+    fs.createReadStream(transPath)
       .pipe(csv())
       .on('data', (row) => {
         translations.push(row)
