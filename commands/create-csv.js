@@ -1,38 +1,38 @@
-var fs = require('fs')
+var fs = require("fs");
 
-const { prompt } = require('inquirer')
+const { prompt } = require("inquirer");
 
 module.exports = function () {
   this.createCSV = function (options) {
-    let outputPath = 'translations.csv'
+    let outputPath = "translations.csv";
 
     // check if output file exists
     if (fs.existsSync(outputPath)) {
       if (!options.force) {
         prompt([
           {
-            type: 'confirm',
-            name: 'confirmOverwrite',
+            type: "confirm",
+            name: "confirmOverwrite",
             message: `File ${outputPath} exists. Overwrite it?`
           }
         ]).then((answers) => {
           if (answers.confirmOverwrite) {
-            console.log('INFO: Skip this prompt in future with the --force (or -f) option.')
-            copyFile()
+            console.log("INFO: Skip this prompt in future with the --force (or -f) option.");
+            copyFile();
           }
-        })
+        });
       } else {
-        copyFile()
+        copyFile();
       }
     } else {
-      copyFile()
+      copyFile();
     }
 
     function copyFile() {
       fs.copyFile(`${__dirname}/../sample-csv/translations.csv`, `${outputPath}`, (err) => {
-        if (err) throw err
-        console.log(`/translations.csv was generated.`)
-      })
+        if (err) throw err;
+        console.log(`/translations.csv was generated.`);
+      });
     }
-  }
-}
+  };
+};

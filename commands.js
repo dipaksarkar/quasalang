@@ -3,7 +3,7 @@
 let pjson = require("./package.json");
 
 const program = require("commander");
-const { createCSV, generate, langSwitcher, listCodes, translate } = require("./index.js");
+const { createCSV, generate, langSwitcher, listCodes, translate, parse } = require("./index.js");
 
 const helpText = `
 
@@ -32,20 +32,14 @@ program
   .option("-i, --input <mode>", "Path to input CSV", "translations.csv")
   .option("-o, --output <mode>", "Path to i18n output folder", "src/i18n")
   .option("-f, --force", "Force write files (without prompt)", false)
-  .option(
-    "-nw, --nowatermark",
-    'Disable the watermark ("This file was auto-generated..") ',
-    false
-  )
+  .option("-nw, --nowatermark", 'Disable the watermark ("This file was auto-generated..") ', false)
   .option(
     "-ls, --lang-switcher",
     `Generate language switcher options array & output to console i.e. [{ label: 'English', value: 'en-US'}, ..]`,
     false
   )
   .option("-w, --watch", `Watch CSV file for changes & regenerate files`, false)
-  .description(
-    "Generate your i18n folder & all language files based on a CSV file"
-  )
+  .description("Generate your i18n folder & all language files based on a CSV file")
   .action((options) => {
     generate(options);
   });
@@ -54,21 +48,24 @@ program
   .command("translate")
   .alias("t")
   .option("-f, --force", "Force write files (without prompt)", false)
-  .description(
-    "Translate your CSV file"
-  )
+  .description("Translate your CSV file")
   .action((options) => {
     translate(options);
   });
 
 program
+  .command("parse")
+  .alias("p")
+  .option("-f, --force", "Force write files (without prompt)", false)
+  .description("Parse your source files from ./src/**/*.{js,vue}")
+  .action((options) => {
+    parse(options);
+  });
+
+program
   .command("create-csv")
   .alias("c")
-  .option(
-    "-f, --force",
-    "Force overwrite translations file (without prompt)",
-    false
-  )
+  .option("-f, --force", "Force overwrite translations file (without prompt)", false)
   .description("Create a sample CSV file (/translations.csv)")
   .action((options) => {
     createCSV(options);
