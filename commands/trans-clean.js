@@ -11,31 +11,43 @@ module.exports = function () {
 
     // Read the input CSV file
     fs.createReadStream(transPath)
-      .pipe(csv()) // Skip header row
+      .pipe(csv())
       .on('data', (row) => {
         const key = row.Key
-        const pattern = new RegExp(`"${key}"|'${key}'`, 'g')
+
+        // Escape the key for regex usage
+        const escapedKey = key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')
+
+        // Match keys wrapped in either single or double quotes
+        const pattern = new RegExp(`[\"\']${escapedKey}[\"\']`, 'g')
 
         // Check if the key is present in any Vue or JS file in the directory (excluding i18n)
         const files = glob.sync(`${sourcePath}/**/*.{vue,js}`, {
           ignore: `${sourcePath}/i18n/**/*.{vue,js}`
         })
 
+        // Debugging: Log matched files for the current key
+        let foundInFiles = []
+
         const keyFound = files.some((filePath) => {
           const fileContent = fs.readFileSync(filePath, 'utf8')
-          return pattern.test(fileContent)
+          const isMatch = pattern.test(fileContent)
+          if (isMatch) {
+            foundInFiles.push(filePath)
+          }
+          return isMatch
         })
 
         if (keyFound) {
           filteredRows.push(row)
         } else {
-          console.log(pattern, keyFound)
+          // Log missed keys and the pattern
+          console.log(key, pattern)
         }
       })
       .on('end', () => {
-        // Check if there are any rows to write
+        // Write the filtered rows to a new CSV file
         if (filteredRows.length > 0) {
-          // Write the filtered rows to a new CSV file with double quotes around each value
           const header = Object.keys(filteredRows[0])
             .map((value) => `"${value.replace(/"/g, '""')}"`)
             .join(',')
