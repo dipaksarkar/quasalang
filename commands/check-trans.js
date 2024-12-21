@@ -12,14 +12,14 @@ function replacePatternInFile(filePath) {
   const patternDoubleQuotes = /\$t\("(.*?)"\)/g
   content = content.replace(patternDoubleQuotes, (match, value) => {
     if (!filteredRows.find((item) => item.Key === value)) {
-      console.log(filePath, value)
+      console.log(`Find missing trans key in (/translations.csv) from ${filePath}`, value)
     }
   })
 
   const patternSingleQuotes = /\$t\('(.*?)'\)/g
   content = content.replace(patternSingleQuotes, (match, value) => {
     if (!filteredRows.find((item) => item.Key === value)) {
-      console.log(filePath, value)
+      console.log(`Find missing trans key in (/translations.csv) from ${filePath}`, value)
     }
   })
 }

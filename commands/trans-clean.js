@@ -21,14 +21,10 @@ module.exports = function () {
           ignore: `${sourcePath}/i18n/**/*.{vue,js}`
         })
 
-        let keyFound = files.some((filePath) => {
+        const keyFound = files.some((filePath) => {
           const fileContent = fs.readFileSync(filePath, 'utf8')
           return pattern.test(fileContent)
         })
-
-        if (key.startsWith('types.') || key.startsWith('months.')) {
-          keyFound = true
-        }
 
         if (keyFound) {
           filteredRows.push(row)

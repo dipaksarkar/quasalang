@@ -42,6 +42,7 @@ program
   .option('-o, --output <mode>', 'Path to i18n output folder', 'src/i18n')
   .option('-f, --force', 'Force write files (without prompt)', false)
   .option('-nw, --nowatermark', 'Disable the watermark ("This file was auto-generated..") ', false)
+  .option('-c, --custom-key', 'Custom key', false)
   .option(
     '-ls, --lang-switcher',
     `Generate language switcher options array & output to console i.e. [{ label: 'English', value: 'en-US'}, ..]`,
@@ -66,6 +67,7 @@ program
   .command('parse')
   .alias('p')
   .option('-f, --force', 'Force write files (without prompt)', false)
+  .option('-c, --custom-key', 'Custom key', false)
   .description(
     'Parse your source files from (/src/**/*.{js,vue}) and Add them to (/translations.csv) as Default language'
   )

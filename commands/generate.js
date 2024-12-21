@@ -146,14 +146,18 @@ module.exports = function () {
                   if (result.Key && !result.Key.startsWith('#')) {
                     const key = result.Key
                     const value = result[langObj.langAndCode]
-                    const keyParts = key.split('.')
                     let currentObj = translations || (translations = {})
 
-                    for (const part of keyParts.slice(0, -1)) {
-                      currentObj = currentObj[part] || (currentObj[part] = {})
-                    }
-                    if (value) {
-                      currentObj[keyParts.slice(-1)[0]] = value.trim()
+                    if (options.customKey) {
+                      const keyParts = key.split('.')
+                      for (const part of keyParts.slice(0, -1)) {
+                        currentObj = currentObj[part] || (currentObj[part] = {})
+                      }
+                      if (value) {
+                        currentObj[keyParts.slice(-1)[0]] = value
+                      }
+                    } else {
+                      currentObj[key] = value
                     }
                   }
                 })

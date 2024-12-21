@@ -18,7 +18,7 @@ fs.createReadStream(transPath)
   })
 
 // Function to replace the pattern in a file
-function replacePatternInFile(filePath) {
+function replacePatternInFile(filePath, options) {
   let content = fs.readFileSync(filePath, 'utf8')
   const languages = headers
     .slice(1, headers.length - 1)
@@ -61,30 +61,33 @@ function replacePatternInFile(filePath) {
         if (err) {
           console.error(`Error appending to CSV: ${err}`)
         } else {
-          console.log(`Added to CSV: ${line.trim()}`)
+          console.log(`Added to CSV from ${filePath}: ${line.trim()}`)
         }
       })
     }
   }
 
-  const patternDoubleQuotes = /"(.*?)"/g
-  content = content.replace(patternDoubleQuotes, (match, result) => {
-    if (result.startsWith('//')) {
-      const { key, value } = parseValue(result)
-      const replacement = `"${key}"`
-      addToCsv(key, value)
-      return replacement
-    }
-    return match
-  })
+  const pattern = new RegExp(`\\$t\\((.*?)\\)`, 'g')
+  content = content.replace(pattern, (match, result) => {
+    if (options.customKey) {
+      match = match.replace(/"(.*?)"/g, (match, result) => {
+        console.log(filePath, JSON.stringify({ match, result }))
+        const { key, value } = parseValue(result)
+        const replacement = `"${key}"`
+        addToCsv(key, value)
+        return replacement
+      })
 
-  const patternSingleQuotes = /'(.*?)'/g
-  content = content.replace(patternSingleQuotes, (match, result) => {
-    if (result.startsWith('//')) {
-      const { key, value } = parseValue(result)
-      const replacement = `'${key}'`
-      addToCsv(key, value)
-      return replacement
+      match = match.replace(/'(.*?)'/g, (match, result) => {
+        console.log(filePath, JSON.stringify({ match, result }))
+        const { key, value } = parseValue(result)
+        const replacement = `'${key}'`
+        addToCsv(key, value)
+        return replacement
+      })
+      return match
+    } else if (typeof result === 'string') {
+      addToCsv(result, result)
     }
     return match
   })
@@ -93,14 +96,14 @@ function replacePatternInFile(filePath) {
 }
 
 // Function to replace the pattern in all matching files
-function replacePatternInFiles(directoryPath) {
+function replacePatternInFiles(directoryPath, options) {
   glob(`${directoryPath}/**/*.{vue,js}`, (err, files) => {
     if (err) {
       console.error('Error reading files:', err)
       return
     }
     files.forEach((file) => {
-      replacePatternInFile(file)
+      replacePatternInFile(file, options)
     })
   })
 }
@@ -108,6 +111,6 @@ function replacePatternInFiles(directoryPath) {
 // Start the replacement process
 module.exports = function () {
   this.parse = function (options) {
-    replacePatternInFiles(sourcePath)
+    replacePatternInFiles(sourcePath, options)
   }
 }
