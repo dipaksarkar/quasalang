@@ -167,6 +167,14 @@ module.exports = function () {
                 // add closing brace
                 languageIndexFile += `export default ${languageData};\n`
 
+                // write the language json file
+                let languageJsonFilePath = `${options.json}/${langObj.code}.json`
+                fs.writeFile(`${languageJsonFilePath}`, languageData, function (err) {
+                  if (err) {
+                    return console.log(err)
+                  }
+                })
+
                 // write the language index file
                 let languageIndexFilePath = `${options.output}/${langObj.code}/index.js`
                 fs.writeFile(`${languageIndexFilePath}`, languageIndexFile, function (err) {

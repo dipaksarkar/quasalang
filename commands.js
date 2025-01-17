@@ -40,6 +40,7 @@ program
   .alias('g')
   .option('-i, --input <mode>', 'Path to input CSV', 'translations.csv')
   .option('-o, --output <mode>', 'Path to i18n output folder', 'src/i18n')
+  .option('-j, --json <mode>', 'Path to json output folder', 'public/langs')
   .option('-f, --force', 'Force write files (without prompt)', false)
   .option('-nw, --nowatermark', 'Disable the watermark ("This file was auto-generated..") ', false)
   .option('-c, --custom-key', 'Custom key', false)
