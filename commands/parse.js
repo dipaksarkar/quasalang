@@ -410,13 +410,13 @@ class VueTranslator {
   }
 
   // Process single file in place
-  processFileInPlace(filePath) {
+  processFileInPlace(filePath, options = {}) {
     try {
       const content = fs.readFileSync(filePath, 'utf8')
 
-      // Check if file already has many translations
+      // Check if file already has many translations, unless force option is enabled
       const translationCount = (content.match(/\$t\(['"]/g) || []).length
-      if (translationCount > 5) {
+      if (translationCount > 5 && !options.force) {
         console.log(`⏭️  Skipping already well-translated file: ${filePath}`)
         return false
       }
@@ -462,7 +462,7 @@ class VueTranslator {
     // Process each file
     let successCount = 0
     filesToProcess.forEach((filePath) => {
-      if (this.processFileInPlace(filePath)) {
+      if (this.processFileInPlace(filePath, options)) {
         successCount++
       }
     })
