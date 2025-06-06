@@ -4,39 +4,6 @@ const glob = require('glob')
 const csv = require('csv-parser')
 const { toCamelCase, sourcePath, transPath } = require('./helpers')
 
-// Try to load csv-stringify/sync, but fall back to a manual implementation if not available
-let csvStringify
-try {
-  // Try to import from csv-stringify/sync (newer versions)
-  const { stringify } = require('csv-stringify/sync')
-  csvStringify = stringify
-} catch (error) {
-  try {
-    // Try to import from main package (older versions)
-    const stringify = require('csv-stringify')
-
-    // Create a sync wrapper for the async version
-    csvStringify = (data, options) => {
-      // Simple synchronous implementation for basic CSV conversion
-      const headers = options.columns || (data[0] ? Object.keys(data[0]) : [])
-      const rows = [options.header ? headers : null].filter(Boolean).concat(
-        data.map((row) =>
-          headers.map((header) => {
-            const value = row[header] || ''
-            // Basic CSV escaping for values with commas or quotes
-            return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
-          })
-        )
-      )
-      return rows.map((row) => (row || []).join(',')).join('\n')
-    }
-    console.log('ℹ️  Using fallback CSV stringify implementation')
-  } catch (fallbackError) {
-    console.error("❌ Error: CSV packages not properly installed. Run 'npm install csv-parser csv-stringify'")
-    csvStringify = (data) => JSON.stringify(data) // Last resort fallback
-  }
-}
-
 class VueTranslator {
   constructor() {
     this.translations = new Map()
@@ -162,6 +129,16 @@ class VueTranslator {
       return placeholder
     })
 
+    // Protect v-html attributes with $t calls
+    processed = processed.replace(
+      /v-html\s*=\s*["']([\s\S]*?\$t\s*\([\s\S]*?\)[\s\S]*?)["']/gi,
+      (match, content) => {
+        const placeholder = `__V_HTML_PLACEHOLDER_${placeholderCounter++}__`
+        protectedContent.set(placeholder, match)
+        return placeholder
+      }
+    )
+
     // More comprehensive protection for existing translations
     // First, protect $t calls with their content to avoid nested translations
     const translationPattern = /(\$t\(['"].*?['"](?:,\s*\{.*?\})?\))/gi
@@ -280,74 +257,95 @@ class VueTranslator {
       },
       // Placeholder attributes - only match regular placeholder="text" not :placeholder or v-bind:placeholder
       {
-        pattern: /([^:v-]placeholder=["'])([^"']+)(["'])/gi,
+        pattern: / placeholder=(["'])(.*?)\1(?=[^=]|$)/gi, // Match full placeholder attribute
         replacement: (match, prefix, text, suffix) => {
           if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
             return match
           }
           this.translations.set(text, text)
-          // Use single quotes for the translation key
-          return ` :placeholder="$t('${text.replace(/'/g, "\\'")}')"`
+          // Replace problematic characters with valid alternatives instead of escaping
+          const safeKey = text
+            .replace(/'/g, '`') // Replace single quotes with backticks
+            .replace(/\\/g, '') // Remove backslashes
+          return ` :placeholder="$t('${safeKey}')"`
         }
       },
       // Label attributes - only match regular label="text" not :label or v-bind:label
       {
-        pattern: /([^:v-]label=["'])([^"']+)(["'])/gi,
+        pattern: / label=(["'])(.*?)\1(?=[^=]|$)/gi, // Match full label attribute
         replacement: (match, prefix, text, suffix) => {
           if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
             return match
           }
           this.translations.set(text, text)
-          // Use single quotes for the translation key
-          return ` :label="$t('${text.replace(/'/g, "\\'")}')"`
+          // Replace problematic characters with valid alternatives instead of escaping
+          const safeKey = text
+            .replace(/'/g, '`') // Replace single quotes with backticks
+            .replace(/\\/g, '') // Remove backslashes
+          return ` :label="$t('${safeKey}')"`
         }
       },
       // Title attributes - only match regular title="text" not :title or v-bind:title
       {
-        pattern: /([^:v-]title=["'])([^"']+)(["'])/gi,
+        pattern: / title=(["'])(.*?)\1(?=[^=]|$)/gi, // Match full title attribute
         replacement: (match, prefix, text, suffix) => {
           if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
             return match
           }
           this.translations.set(text, text)
-          // Use single quotes for the translation key
-          return ` :title="$t('${text.replace(/'/g, "\\'")}')"`
+          // Replace problematic characters with valid alternatives instead of escaping
+          const safeKey = text
+            .replace(/'/g, '`') // Replace single quotes with backticks
+            .replace(/\\/g, '') // Remove backslashes
+          return ` :title="$t('${safeKey}')"`
         }
       },
       // Message attributes - only match regular message="text" not :message or v-bind:message
       {
-        pattern: /([^:v-]message=["'])([^"']+)(["'])/gi,
+        pattern: / message=(["'])(.*?)\1(?=[^=]|$)/gi, // Match full message attribute
         replacement: (match, prefix, text, suffix) => {
           if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
             return match
           }
           this.translations.set(text, text)
-          // Use single quotes for the translation key
-          return ` :message="$t('${text.replace(/'/g, "\\'")}')"`
+          // Replace problematic characters with valid alternatives instead of escaping
+          const safeKey = text
+            .replace(/'/g, '`') // Replace single quotes with backticks
+            .replace(/\\/g, '') // Remove backslashes
+          return ` :message="$t('${safeKey}')"`
         }
       },
-      // Hint attributes - only match regular hint="text" not :hint or v-bind:hint
+      // Hint attributes - special handling for complex content
       {
-        pattern: /([^:v-]hint=["'])([^"']+)(["'])/gi,
-        replacement: (match, prefix, text, suffix) => {
-          if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
+        pattern: / hint=(["'])(.*?)\1(?=[^=]|$)/gi, // Match full hint attribute
+        replacement: (match, quote, text) => {
+          if (!this.shouldTranslate(text)) {
             return match
           }
           this.translations.set(text, text)
-          // Use single quotes for the translation key
-          return ` :hint="$t('${text.replace(/'/g, "\\'")}')"`
+
+          // Replace problematic characters with valid alternatives instead of escaping
+          const safeKey = text
+            .replace(/'/g, '`') // Replace single quotes with backticks
+            .replace(/\\/g, '') // Remove backslashes
+
+          // Use the sanitized key directly
+          return ` :hint="$t('${safeKey}')"`
         }
       },
       // Alt text for images - only match regular alt="text" not :alt or v-bind:alt
       {
-        pattern: /([^:v-]alt=["'])([^"']+)(["'])/gi,
+        pattern: / alt=(["'])(.*?)\1(?=[^=]|$)/gi, // Match full alt attribute
         replacement: (match, prefix, text, suffix) => {
           if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
             return match
           }
           this.translations.set(text, text)
-          // Use single quotes for the translation key
-          return ` :alt="$t('${text.replace(/'/g, "\\'")}')"`
+          // Replace problematic characters with valid alternatives instead of escaping
+          const safeKey = text
+            .replace(/'/g, '`') // Replace single quotes with backticks
+            .replace(/\\/g, '') // Remove backslashes
+          return ` :alt="$t('${safeKey}')"`
         }
       }
     ]
