@@ -547,11 +547,48 @@ function replacePatternInFile(filePath, options) {
     }
   }
 
-  const doubleQuote = new RegExp(`\\$t\\("(.*?)"\\)`, 'g')
+  // Capture Double quoted strings with parameters
+  // Handles: $t("text", {...}) with any whitespace
+  const doubleQuoteWithParams = new RegExp(`\\$t\\(\\s*"(.*?)"\\s*,\\s*{[^}]*}\\s*\\)`, 'g')
+  content = content.replace(doubleQuoteWithParams, (match, result) => {
+    if (options.customKey) {
+      const { key, value } = parseValue(result)
+      // Keep the original parameters part
+      const paramsStart = match.indexOf(',')
+      const paramsSection = match.substring(paramsStart)
+      const replacement = `$t("${key}"${paramsSection}`
+      addToCsv(key, value)
+      return replacement
+    } else if (typeof result === 'string') {
+      addToCsv(result, result)
+    }
+    return match
+  })
+
+  // Capture Single quoted strings with parameters
+  // Handles: $t('text', {...}) with any whitespace
+  const singleQuoteWithParams = new RegExp(`\\$t\\(\\s*'(.*?)'\\s*,\\s*{[^}]*}\\s*\\)`, 'g')
+  content = content.replace(singleQuoteWithParams, (match, result) => {
+    if (options.customKey) {
+      const { key, value } = parseValue(result)
+      // Keep the original parameters part
+      const paramsStart = match.indexOf(',')
+      const paramsSection = match.substring(paramsStart)
+      const replacement = `$t('${key}'${paramsSection}`
+      addToCsv(key, value)
+      return replacement
+    } else if (typeof result === 'string') {
+      addToCsv(result, result)
+    }
+    return match
+  })
+
+  // Handle standard translation patterns (simple double quotes)
+  const doubleQuote = new RegExp(`\\$t\\(\\s*"(.*?)"\\s*\\)`, 'g')
   content = content.replace(doubleQuote, (match, result) => {
     if (options.customKey) {
       const { key, value } = parseValue(result)
-      const replacement = `"${key}"`
+      const replacement = `$t("${key}")`
       addToCsv(key, value)
       return replacement
     } else if (typeof result === 'string') {
@@ -560,11 +597,12 @@ function replacePatternInFile(filePath, options) {
     return match
   })
 
-  const singleQuote = new RegExp(`\\$t\\('(.*?)'\\)`, 'g')
+  // Handle standard translation patterns (simple single quotes)
+  const singleQuote = new RegExp(`\\$t\\(\\s*'(.*?)'\\s*\\)`, 'g')
   content = content.replace(singleQuote, (match, result) => {
     if (options.customKey) {
       const { key, value } = parseValue(result)
-      const replacement = `'${key}'`
+      const replacement = `$t('${key}')`
       addToCsv(key, value)
       return replacement
     } else if (typeof result === 'string') {
@@ -572,31 +610,6 @@ function replacePatternInFile(filePath, options) {
     }
     return match
   })
-
-  // const pattern = new RegExp(`\\$t\\((.*?)\\)`, 'g')
-  // content = content.replace(pattern, (match, result) => {
-  //   if (options.customKey) {
-  //     match = match.replace(/"(.*?)"/g, (match, result) => {
-  //       console.log(filePath, JSON.stringify({ match, result }))
-  //       const { key, value } = parseValue(result)
-  //       const replacement = `"${key}"`
-  //       addToCsv(key, value)
-  //       return replacement
-  //     })
-
-  //     match = match.replace(/'(.*?)'/g, (match, result) => {
-  //       console.log(filePath, JSON.stringify({ match, result }))
-  //       const { key, value } = parseValue(result)
-  //       const replacement = `'${key}'`
-  //       addToCsv(key, value)
-  //       return replacement
-  //     })
-  //     return match
-  //   } else if (typeof result === 'string') {
-  //     addToCsv(result, result)
-  //   }
-  //   return match
-  // })
 
   fs.writeFileSync(filePath, content, 'utf8')
 }
