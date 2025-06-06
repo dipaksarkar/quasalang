@@ -1,7 +1,487 @@
 const fs = require('fs')
+const path = require('path')
 const glob = require('glob')
 const csv = require('csv-parser')
 const { toCamelCase, sourcePath, transPath } = require('./helpers')
+
+// Try to load csv-stringify/sync, but fall back to a manual implementation if not available
+let csvStringify
+try {
+  // Try to import from csv-stringify/sync (newer versions)
+  const { stringify } = require('csv-stringify/sync')
+  csvStringify = stringify
+} catch (error) {
+  try {
+    // Try to import from main package (older versions)
+    const stringify = require('csv-stringify')
+
+    // Create a sync wrapper for the async version
+    csvStringify = (data, options) => {
+      // Simple synchronous implementation for basic CSV conversion
+      const headers = options.columns || (data[0] ? Object.keys(data[0]) : [])
+      const rows = [options.header ? headers : null].filter(Boolean).concat(
+        data.map((row) =>
+          headers.map((header) => {
+            const value = row[header] || ''
+            // Basic CSV escaping for values with commas or quotes
+            return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+          })
+        )
+      )
+      return rows.map((row) => (row || []).join(',')).join('\n')
+    }
+    console.log('ℹ️  Using fallback CSV stringify implementation')
+  } catch (fallbackError) {
+    console.error("❌ Error: CSV packages not properly installed. Run 'npm install csv-parser csv-stringify'")
+    csvStringify = (data) => JSON.stringify(data) // Last resort fallback
+  }
+}
+
+class VueTranslator {
+  constructor() {
+    this.translations = new Map()
+    this.processedFiles = []
+    this.existingTranslations = new Map()
+  }
+
+  // Check if text should be translated
+  shouldTranslate(text) {
+    const trimmed = text.trim()
+
+    // Skip empty strings, numbers, or single characters
+    if (!trimmed || trimmed.length < 2 || /^\d+$/.test(trimmed)) {
+      return false
+    }
+
+    // Skip currency and common symbols
+    if (/^[$€£¥₹¢₩₽₺₪₫₴₦₲₵₡₢₣₤₥₧₨₰₱₲₳₴₵₸₺₼₽₾₿]+$/.test(trimmed)) {
+      return false
+    }
+
+    // Skip technical terms, URLs, or code-like content
+    if (/^(href|src|class|id|data-|\/|#|@|::)/.test(trimmed)) {
+      return false
+    }
+
+    // Skip shortcodes and HTML-like patterns
+    if (/^<[^>]+>.*<\/[^>]+>$/.test(trimmed)) {
+      return false
+    }
+
+    // Skip Vue directives and bindings
+    if (/^(v-|:|@)/.test(trimmed)) {
+      return false
+    }
+
+    // Only translate if it contains letters
+    return /[a-zA-Z]/.test(trimmed)
+  }
+
+  // Clean and normalize text
+  cleanText(text) {
+    return text
+      .replace(/\s+/g, ' ') // Replace multiple whitespace/newlines with single space
+      .trim()
+  }
+
+  // Split text into sentences and limit to max 2 sentences
+  splitAndLimitSentences(text) {
+    const cleanedText = this.cleanText(text)
+
+    // Split by sentence endings (., !, ?)
+    const sentences = cleanedText.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 0)
+
+    if (sentences.length <= 2) {
+      return [cleanedText]
+    }
+
+    // If more than 2 sentences, split into chunks of max 2 sentences
+    const chunks = []
+    for (let i = 0; i < sentences.length; i += 2) {
+      const chunk = sentences.slice(i, i + 2).join(' ')
+      chunks.push(chunk)
+    }
+
+    return chunks
+  }
+
+  // Wrap text with translation function using original text as key
+  wrapWithTranslation(text) {
+    if (!this.shouldTranslate(text)) {
+      return text
+    }
+
+    const textChunks = this.splitAndLimitSentences(text)
+
+    // If text was split into multiple chunks, process each separately
+    if (textChunks.length > 1) {
+      return textChunks
+        .map((chunk) => {
+          this.translations.set(chunk, chunk)
+          // Use JSON.stringify to safely escape quotes and special characters
+          return `{{ $t(${JSON.stringify(chunk)}) }}`
+        })
+        .join(' ')
+    }
+
+    // Single chunk processing
+    const cleanText = textChunks[0]
+    this.translations.set(cleanText, cleanText)
+    // Use JSON.stringify to safely escape quotes and special characters
+    return `{{ $t(${JSON.stringify(cleanText)}) }}`
+  }
+
+  // Helper method to determine if an attribute should be processed
+  shouldProcessAttribute(fullAttributeMatch) {
+    // Skip if this is already a bound attribute (starts with : or v-bind:)
+    if (fullAttributeMatch.match(/^(:|v-bind:)/i)) {
+      return false
+    }
+    return true
+  }
+
+  // Process Vue content
+  processVueContent(content) {
+    let processed = content
+
+    // First, protect script and style content by replacing with placeholders
+    const protectedContent = new Map()
+    let placeholderCounter = 0
+
+    // Protect <script> blocks
+    processed = processed.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, (match) => {
+      const placeholder = `__SCRIPT_PLACEHOLDER_${placeholderCounter++}__`
+      protectedContent.set(placeholder, match)
+      return placeholder
+    })
+
+    // Protect <style> blocks
+    processed = processed.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, (match) => {
+      const placeholder = `__STYLE_PLACEHOLDER_${placeholderCounter++}__`
+      protectedContent.set(placeholder, match)
+      return placeholder
+    })
+
+    // More comprehensive protection for existing translations
+    // First, protect $t calls with their content to avoid nested translations
+    const translationPattern = /(\$t\(['"].*?['"](?:,\s*\{.*?\})?\))/gi
+    processed = processed.replace(translationPattern, (match) => {
+      const placeholder = `__TRANSLATION_PLACEHOLDER_${placeholderCounter++}__`
+      protectedContent.set(placeholder, match)
+
+      // Extract key from $t call to track it
+      const keyMatch = match.match(/\$t\(['"](.+?)['"](?:,|\))/)
+      if (keyMatch && keyMatch[1]) {
+        // Add to translations map to avoid retranslating
+        this.translations.set(keyMatch[1], keyMatch[1])
+      }
+
+      return placeholder
+    })
+
+    // Also protect interpolated translations {{ $t(...) }}
+    processed = processed.replace(/\{\{\s*(\$t\(['"].*?['"](?:,\s*\{.*?\})?\))\s*\}\}/gi, (match, tCall) => {
+      const placeholder = `__INTERPOLATION_PLACEHOLDER_${placeholderCounter++}__`
+      protectedContent.set(placeholder, match)
+
+      // Extract key from $t call to track it
+      const keyMatch = tCall.match(/\$t\(['"](.+?)['"](?:,|\))/)
+      if (keyMatch && keyMatch[1]) {
+        // Add to translations map to avoid retranslating
+        this.translations.set(keyMatch[1], keyMatch[1])
+      }
+
+      return placeholder
+    })
+
+    // Patterns to match text content in Vue template
+    const textPatterns = [
+      // Button content
+      {
+        pattern: /(<q-btn[^>]*>)\s*([^<{]+?)\s*(<\/q-btn>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Label content
+      {
+        pattern: /(<label[^>]*>)\s*([^<{]+?)\s*(<\/label>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Header tags (h1-h6)
+      {
+        pattern: /(<h[1-6][^>]*>)\s*([^<{]+?)\s*(<\/h[1-6]>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Paragraph content
+      {
+        pattern: /(<p[^>]*>)\s*([^<{]+?)\s*(<\/p>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Span content
+      {
+        pattern: /(<span[^>]*>)\s*([^<{]+?)\s*(<\/span>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Div content with only text
+      {
+        pattern: /(<div[^>]*>)\s*([^<{]+?)\s*(<\/div>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // List items
+      {
+        pattern: /(<li[^>]*>)\s*([^<{]+?)\s*(<\/li>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Table cells
+      {
+        pattern: /(<td[^>]*>)\s*([^<{]+?)\s*(<\/td>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Table headers
+      {
+        pattern: /(<th[^>]*>)\s*([^<{]+?)\s*(<\/th>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Quasar specific components
+      {
+        pattern: /(<q-item-label[^>]*>)\s*([^<{]+?)\s*(<\/q-item-label>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      {
+        pattern: /(<q-item-section[^>]*>)\s*([^<{]+?)\s*(<\/q-item-section>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      {
+        pattern: /(<q-card-section[^>]*>)\s*([^<{]+?)\s*(<\/q-card-section>)/gi,
+        replacement: (match, openTag, text, closeTag) => {
+          return openTag + this.wrapWithTranslation(text) + closeTag
+        }
+      },
+      // Placeholder attributes - only match regular placeholder="text" not :placeholder or v-bind:placeholder
+      {
+        pattern: /([^:v-]placeholder=["'])([^"']+)(["'])/gi,
+        replacement: (match, prefix, text, suffix) => {
+          if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
+            return match
+          }
+          this.translations.set(text, text)
+          // Use single quotes for the translation key
+          return ` :placeholder="$t('${text.replace(/'/g, "\\'")}')"`
+        }
+      },
+      // Label attributes - only match regular label="text" not :label or v-bind:label
+      {
+        pattern: /([^:v-]label=["'])([^"']+)(["'])/gi,
+        replacement: (match, prefix, text, suffix) => {
+          if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
+            return match
+          }
+          this.translations.set(text, text)
+          // Use single quotes for the translation key
+          return ` :label="$t('${text.replace(/'/g, "\\'")}')"`
+        }
+      },
+      // Title attributes - only match regular title="text" not :title or v-bind:title
+      {
+        pattern: /([^:v-]title=["'])([^"']+)(["'])/gi,
+        replacement: (match, prefix, text, suffix) => {
+          if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
+            return match
+          }
+          this.translations.set(text, text)
+          // Use single quotes for the translation key
+          return ` :title="$t('${text.replace(/'/g, "\\'")}')"`
+        }
+      },
+      // Message attributes - only match regular message="text" not :message or v-bind:message
+      {
+        pattern: /([^:v-]message=["'])([^"']+)(["'])/gi,
+        replacement: (match, prefix, text, suffix) => {
+          if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
+            return match
+          }
+          this.translations.set(text, text)
+          // Use single quotes for the translation key
+          return ` :message="$t('${text.replace(/'/g, "\\'")}')"`
+        }
+      },
+      // Hint attributes - only match regular hint="text" not :hint or v-bind:hint
+      {
+        pattern: /([^:v-]hint=["'])([^"']+)(["'])/gi,
+        replacement: (match, prefix, text, suffix) => {
+          if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
+            return match
+          }
+          this.translations.set(text, text)
+          // Use single quotes for the translation key
+          return ` :hint="$t('${text.replace(/'/g, "\\'")}')"`
+        }
+      },
+      // Alt text for images - only match regular alt="text" not :alt or v-bind:alt
+      {
+        pattern: /([^:v-]alt=["'])([^"']+)(["'])/gi,
+        replacement: (match, prefix, text, suffix) => {
+          if (!this.shouldProcessAttribute(prefix) || !this.shouldTranslate(text)) {
+            return match
+          }
+          this.translations.set(text, text)
+          // Use single quotes for the translation key
+          return ` :alt="$t('${text.replace(/'/g, "\\'")}')"`
+        }
+      }
+    ]
+
+    // Apply patterns
+    textPatterns.forEach(({ pattern, replacement }) => {
+      processed = processed.replace(pattern, replacement)
+    })
+
+    // Restore protected content
+    // Sort placeholders by length (descending) to avoid partial replacements
+    const sortedPlaceholders = Array.from(protectedContent.keys()).sort((a, b) => b.length - a.length)
+
+    for (const placeholder of sortedPlaceholders) {
+      const originalContent = protectedContent.get(placeholder)
+      // Replace all occurrences of the placeholder
+      processed = processed.split(placeholder).join(originalContent)
+    }
+
+    return processed
+  }
+
+  // Check if path is a directory
+  isDirectory(filePath) {
+    try {
+      return fs.statSync(filePath).isDirectory()
+    } catch (error) {
+      return false
+    }
+  }
+
+  // Check if file is a Vue file
+  isVueFile(filePath) {
+    return path.extname(filePath) === '.vue'
+  }
+
+  // Get all Vue files in directory recursively
+  getVueFiles(dirPath) {
+    const vueFiles = []
+
+    const scanDirectory = (currentPath) => {
+      try {
+        const items = fs.readdirSync(currentPath)
+
+        items.forEach((item) => {
+          const itemPath = path.join(currentPath, item)
+          const stat = fs.statSync(itemPath)
+
+          if (stat.isDirectory()) {
+            scanDirectory(itemPath)
+          } else if (stat.isFile() && this.isVueFile(itemPath)) {
+            vueFiles.push(itemPath)
+          }
+        })
+      } catch (error) {
+        console.warn(`⚠️  Cannot read directory: ${currentPath}`)
+      }
+    }
+
+    scanDirectory(dirPath)
+    return vueFiles
+  }
+
+  // Process single file in place
+  processFileInPlace(filePath) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf8')
+
+      // Check if file already has many translations
+      const translationCount = (content.match(/\$t\(['"]/g) || []).length
+      if (translationCount > 5) {
+        console.log(`⏭️  Skipping already well-translated file: ${filePath}`)
+        return false
+      }
+
+      const processed = this.processVueContent(content)
+
+      // Only write if content changed
+      if (processed !== content) {
+        fs.writeFileSync(filePath, processed)
+        this.processedFiles.push(filePath)
+        console.log(`✅ Updated file: ${filePath}`)
+        return true
+      } else {
+        console.log(`⏭️  No changes needed: ${filePath}`)
+        return false
+      }
+    } catch (error) {
+      console.error(`❌ Error processing file ${filePath}:`, error.message)
+      return false
+    }
+  }
+
+  // Process multiple files
+  async processPath(inputPath, options = {}) {
+    let filesToProcess = []
+
+    if (this.isDirectory(inputPath)) {
+      console.log(`📁 Processing directory: ${inputPath}`)
+      filesToProcess = this.getVueFiles(inputPath)
+      console.log(`🔍 Found ${filesToProcess.length} Vue files`)
+    } else if (fs.existsSync(inputPath)) {
+      console.log(`📄 Processing single file: ${inputPath}`)
+      filesToProcess = [inputPath]
+    } else {
+      throw new Error(`Path does not exist: ${inputPath}`)
+    }
+
+    if (filesToProcess.length === 0) {
+      console.log('ℹ️  No Vue files found to process')
+      return
+    }
+
+    // Process each file
+    let successCount = 0
+    filesToProcess.forEach((filePath) => {
+      if (this.processFileInPlace(filePath)) {
+        successCount++
+      }
+    })
+
+    // Print summary
+    console.log('\n📋 Processing Summary:')
+    console.log(`   Files processed: ${successCount}/${filesToProcess.length}`)
+    console.log(`   Translations found: ${this.translations.size}`)
+
+    if (this.processedFiles.length > 0) {
+      console.log('\n📝 Modified files:')
+      this.processedFiles.forEach((file) => {
+        console.log(`   - ${file}`)
+      })
+    }
+  }
+}
 
 let headers = []
 let parsedKeys = []
@@ -54,7 +534,7 @@ function replacePatternInFile(filePath, options) {
   const addToCsv = (key, value) => {
     if (!parsedKeys.includes(key) && !originalKeys.includes(key)) {
       // Construct the line to add to the CSV
-      const line = `${key},"${value}",${languages}\n`
+      const line = `"${key}","${value}",${languages}\n`
       parsedKeys.push(key)
       // Append the line to the CSV file
       fs.appendFile(transPath, line, (err) => {
@@ -67,30 +547,56 @@ function replacePatternInFile(filePath, options) {
     }
   }
 
-  const pattern = new RegExp(`\\$t\\((.*?)\\)`, 'g')
-  content = content.replace(pattern, (match, result) => {
+  const doubleQuote = new RegExp(`\\$t\\("(.*?)"\\)`, 'g')
+  content = content.replace(doubleQuote, (match, result) => {
     if (options.customKey) {
-      match = match.replace(/"(.*?)"/g, (match, result) => {
-        console.log(filePath, JSON.stringify({ match, result }))
-        const { key, value } = parseValue(result)
-        const replacement = `"${key}"`
-        addToCsv(key, value)
-        return replacement
-      })
-
-      match = match.replace(/'(.*?)'/g, (match, result) => {
-        console.log(filePath, JSON.stringify({ match, result }))
-        const { key, value } = parseValue(result)
-        const replacement = `'${key}'`
-        addToCsv(key, value)
-        return replacement
-      })
-      return match
+      const { key, value } = parseValue(result)
+      const replacement = `"${key}"`
+      addToCsv(key, value)
+      return replacement
     } else if (typeof result === 'string') {
       addToCsv(result, result)
     }
     return match
   })
+
+  const singleQuote = new RegExp(`\\$t\\('(.*?)'\\)`, 'g')
+  content = content.replace(singleQuote, (match, result) => {
+    if (options.customKey) {
+      const { key, value } = parseValue(result)
+      const replacement = `'${key}'`
+      addToCsv(key, value)
+      return replacement
+    } else if (typeof result === 'string') {
+      addToCsv(result, result)
+    }
+    return match
+  })
+
+  // const pattern = new RegExp(`\\$t\\((.*?)\\)`, 'g')
+  // content = content.replace(pattern, (match, result) => {
+  //   if (options.customKey) {
+  //     match = match.replace(/"(.*?)"/g, (match, result) => {
+  //       console.log(filePath, JSON.stringify({ match, result }))
+  //       const { key, value } = parseValue(result)
+  //       const replacement = `"${key}"`
+  //       addToCsv(key, value)
+  //       return replacement
+  //     })
+
+  //     match = match.replace(/'(.*?)'/g, (match, result) => {
+  //       console.log(filePath, JSON.stringify({ match, result }))
+  //       const { key, value } = parseValue(result)
+  //       const replacement = `'${key}'`
+  //       addToCsv(key, value)
+  //       return replacement
+  //     })
+  //     return match
+  //   } else if (typeof result === 'string') {
+  //     addToCsv(result, result)
+  //   }
+  //   return match
+  // })
 
   fs.writeFileSync(filePath, content, 'utf8')
 }
@@ -108,9 +614,32 @@ function replacePatternInFiles(directoryPath, options) {
   })
 }
 
+// Function to process files using VueTranslator before parsing
+async function makeFilesTranslatable(directoryPath, options) {
+  console.log('🔍 Starting to make files translatable...')
+
+  const translator = new VueTranslator()
+
+  try {
+    // Use transPath for CSV operations
+    await translator.processPath(directoryPath, options)
+    console.log('✅ Translation preparation completed successfully!')
+  } catch (error) {
+    console.error(`❌ Error during translation preparation: ${error.message}`)
+  }
+}
+
 // Start the replacement process
 module.exports = function () {
-  this.parse = function (options) {
-    replacePatternInFiles(sourcePath, options)
+  this.parse = async function (options) {
+    try {
+      // First make files translatable, then run the regular parse
+      await makeFilesTranslatable(sourcePath, options)
+
+      // Then proceed with the original parsing logic
+      replacePatternInFiles(sourcePath, options)
+    } catch (error) {
+      console.error(`❌ Error during parse operation: ${error.message}`)
+    }
   }
 }
