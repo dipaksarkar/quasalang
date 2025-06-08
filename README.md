@@ -47,6 +47,9 @@ You can also:
     - [`translate`](#translate)
     - [`check-trans`](#check-trans)
     - [`trans-clean`](#trans-clean)
+    - [`merge`](#merge)
+      - [Key Features](#key-features)
+      - [Example](#example-1)
 
 ## Getting Started
 
@@ -726,5 +729,71 @@ Remove unused trans key from (/translations.csv)
 Options:
   -h, --help  display help for command
 ```
+
+### `merge`
+
+```
+Usage: quasalang merge|m [options]
+
+Merge another CSV file into translations.csv (preserves Key and English columns)
+
+Options:
+  -f, --file <path>  Path to CSV file to merge (required)
+  -h, --help         display help for command
+```
+
+Merge translations from another CSV file into your main translations.csv file. This is useful for:
+
+- Importing translations from external translation services
+- Merging updates from translators
+- Adding new language columns from other sources
+
+#### Key Features
+
+- **Preserves original structure**: Keeps your Key and English columns unchanged
+- **Updates existing translations**: Overwrites other language columns with new translations
+- **Adds missing columns**: Automatically adds new language columns from the merge file  
+- **Ignores unknown keys**: Only processes keys that exist in your main translations.csv
+- **Creates backup**: Automatically backs up your original file before merging
+
+#### Example
+
+Given your main `translations.csv`:
+
+| Key     | English, en-US | French, fr | German, de      |
+|---------|----------------|------------|-----------------|
+| hello   | Hello          | Bonjour    | Hallo           |
+| goodbye | Goodbye        | Au revoir  | Auf Wiedersehen |
+| thanks  | Thanks         | Merci      | Danke           |
+
+And a merge file `override.csv`:
+
+| Key     | English, en-US | French, fr   | Spanish, es |
+|---------|----------------|--------------|-------------|
+| goodbye | Goodbye        | Au revoir    | Adiós       |
+| hello   | Hello          | Salut        | Hola        |
+
+Running the merge command:
+
+```bash
+$ quasalang merge --file override.csv
+# or
+$ quasalang m -f override.csv
+```
+
+Will result in:
+
+| Key     | English, en-US | French, fr | German, de      | Spanish, es |
+|---------|----------------|------------|-----------------|-------------|
+| hello   | Hello          | Salut      | Hallo           | Hola        |
+| goodbye | Goodbye        | Au revoir  | Auf Wiedersehen | Adiós       |
+| thanks  | Thanks         | Merci      | Danke           |             |
+
+Notice that:
+- English column remains unchanged (preserved)
+- French translations were updated from the merge file
+- German translations were preserved (not in merge file)
+- Spanish column was added as a new language
+- Only existing keys were processed (any unknown keys in override.csv would be ignored)
 
 

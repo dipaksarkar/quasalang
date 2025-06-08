@@ -11,7 +11,8 @@ const {
   translate,
   parse,
   checkTrans,
-  transClean
+  transClean,
+  merge
 } = require('./index.js')
 
 const helpText = `
@@ -119,6 +120,15 @@ program
   .description(`Search & list i18n locale codes`)
   .action((options) => {
     listCodes(options)
+  })
+
+program
+  .command('merge')
+  .alias('m')
+  .option('-f, --file <path>', 'Path to CSV file to merge')
+  .description('Merge another CSV file into translations.csv (preserves Key and English columns)')
+  .action((options) => {
+    merge(options)
   })
 
 program.parse(process.argv)
