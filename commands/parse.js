@@ -545,68 +545,57 @@ function replacePatternInFile(filePath, options) {
     }
   }
 
-  // Capture Double quoted strings with parameters
-  // Handles: $t("text", {...}) with any whitespace
-  const doubleQuoteWithParams = new RegExp(`\\$t\\(\\s*"(.*?)"\\s*,\\s*{[^}]*}\\s*\\)`, 'g')
-  content = content.replace(doubleQuoteWithParams, (match, result) => {
-    if (options.customKey) {
-      const { key, value } = parseValue(result)
-      // Keep the original parameters part
-      const paramsStart = match.indexOf(',')
-      const paramsSection = match.substring(paramsStart)
-      const replacement = `$t("${key}"${paramsSection}`
-      addToCsv(key, value)
-      return replacement
-    } else if (typeof result === 'string') {
-      addToCsv(result, result)
-    }
-    return match
-  })
+  // Define translation function patterns (both $t and t)
+  const translationFunctions = ['\\$t', '\\bt'] // $t for templates, t for useI18n
 
-  // Capture Single quoted strings with parameters
-  // Handles: $t('text', {...}) with any whitespace
-  const singleQuoteWithParams = new RegExp(`\\$t\\(\\s*'(.*?)'\\s*,\\s*{[^}]*}\\s*\\)`, 'g')
-  content = content.replace(singleQuoteWithParams, (match, result) => {
-    if (options.customKey) {
-      const { key, value } = parseValue(result)
-      // Keep the original parameters part
-      const paramsStart = match.indexOf(',')
-      const paramsSection = match.substring(paramsStart)
-      const replacement = `$t('${key}'${paramsSection}`
-      addToCsv(key, value)
-      return replacement
-    } else if (typeof result === 'string') {
-      addToCsv(result, result)
-    }
-    return match
-  })
+  // Helper function to create and apply patterns for both translation functions
+  const applyTranslationPatterns = (funcPattern, quoteType) => {
+    const quote = quoteType === 'double' ? '"' : "'"
 
-  // Handle standard translation patterns (simple double quotes)
-  const doubleQuote = new RegExp(`\\$t\\(\\s*"(.*?)"\\s*\\)`, 'g')
-  content = content.replace(doubleQuote, (match, result) => {
-    if (options.customKey) {
-      const { key, value } = parseValue(result)
-      const replacement = `$t("${key}")`
-      addToCsv(key, value)
-      return replacement
-    } else if (typeof result === 'string') {
-      addToCsv(result, result)
-    }
-    return match
-  })
+    // Pattern with parameters: func("text", {...})
+    const withParamsPattern = new RegExp(
+      `${funcPattern}\\(\\s*${quote}(.*?)${quote}\\s*,\\s*{[^}]*}\\s*\\)`,
+      'g'
+    )
 
-  // Handle standard translation patterns (simple single quotes)
-  const singleQuote = new RegExp(`\\$t\\(\\s*'(.*?)'\\s*\\)`, 'g')
-  content = content.replace(singleQuote, (match, result) => {
-    if (options.customKey) {
-      const { key, value } = parseValue(result)
-      const replacement = `$t('${key}')`
-      addToCsv(key, value)
-      return replacement
-    } else if (typeof result === 'string') {
-      addToCsv(result, result)
-    }
-    return match
+    content = content.replace(withParamsPattern, (match, result) => {
+      const funcName = funcPattern === '\\$t' ? '$t' : 't'
+
+      if (options.customKey) {
+        const { key, value } = parseValue(result)
+        const paramsStart = match.indexOf(',')
+        const paramsSection = match.substring(paramsStart)
+        const replacement = `${funcName}(${quote}${key}${quote}${paramsSection}`
+        addToCsv(key, value)
+        return replacement
+      } else if (typeof result === 'string') {
+        addToCsv(result, result)
+      }
+      return match
+    })
+
+    // Pattern without parameters: func("text")
+    const simplePattern = new RegExp(`${funcPattern}\\(\\s*${quote}(.*?)${quote}\\s*\\)`, 'g')
+
+    content = content.replace(simplePattern, (match, result) => {
+      const funcName = funcPattern === '\\$t' ? '$t' : 't'
+
+      if (options.customKey) {
+        const { key, value } = parseValue(result)
+        const replacement = `${funcName}(${quote}${key}${quote})`
+        addToCsv(key, value)
+        return replacement
+      } else if (typeof result === 'string') {
+        addToCsv(result, result)
+      }
+      return match
+    })
+  }
+
+  // Apply patterns for all translation functions and quote types
+  translationFunctions.forEach((funcPattern) => {
+    applyTranslationPatterns(funcPattern, 'double')
+    applyTranslationPatterns(funcPattern, 'single')
   })
 
   fs.writeFileSync(filePath, content, 'utf8')
