@@ -56,7 +56,7 @@ module.exports = function () {
               .map((value) => `"${value.replace(/"/g, '""')}"`)
               .join(',')
           )
-          const outputContent = [header, ...rows].join('\n')
+          const outputContent = [header, ...rows].join('\n') + '\n'
           fs.writeFileSync(transPath, outputContent, 'utf8')
           console.log('New CSV file created successfully!')
         } else {
