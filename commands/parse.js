@@ -26,7 +26,8 @@ class VueTranslator {
     }
 
     // Skip technical terms, URLs, or code-like content
-    if (/^(href|src|class|id|data-|\/|#|@|::)/.test(trimmed)) {
+    // Also skip if it contains '@' (e.g., email addresses)
+    if (/^(href|src|class|id|data-|\/|#|@|::)/.test(trimmed) || /@/.test(trimmed)) {
       return false
     }
 
