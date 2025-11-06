@@ -12,7 +12,8 @@ const {
   parse,
   checkTrans,
   transClean,
-  merge
+  merge,
+  clean
 } = require('./index.js')
 
 const helpText = `
@@ -129,6 +130,13 @@ program
   .description('Merge another CSV file into translations.csv (preserves Key and English columns)')
   .action((options) => {
     merge(options)
+  })
+
+program
+  .command('clean')
+  .description('Remove duplicate rows by Key from translations.csv')
+  .action((options) => {
+    clean(options)
   })
 
 program.parse(process.argv)

@@ -7,6 +7,7 @@ require('./commands/parse.js')()
 require('./commands/check-trans.js')()
 require('./commands/trans-clean.js')()
 require('./commands/merge.js')()
+require('./commands/clean.js')()
 
 module.exports = {
   createCSV,
@@ -17,5 +18,6 @@ module.exports = {
   parse,
   checkTrans,
   transClean,
-  merge
+  merge,
+  clean
 }
